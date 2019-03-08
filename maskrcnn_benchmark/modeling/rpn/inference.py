@@ -84,26 +84,34 @@ class RPNPostProcessor(torch.nn.Module):
         # put in the same format as anchors
         objectness = permute_and_flatten(objectness, N, A, 1, H, W).view(N, -1)
         objectness = objectness.sigmoid()
+        #object: (B, H*W*A)
 
         box_regression = permute_and_flatten(box_regression, N, A, 4, H, W)
-
+        #box_regression: (B, H*W*A, 4)
         num_anchors = A * H * W
 
         pre_nms_top_n = min(self.pre_nms_top_n, num_anchors)
         objectness, topk_idx = objectness.topk(pre_nms_top_n, dim=1, sorted=True)
+        # select the biggest pre_nms_top_n
 
         batch_idx = torch.arange(N, device=device)[:, None]
         box_regression = box_regression[batch_idx, topk_idx]
+        # select the corresponding box_regression
 
+        # anchors: (boxlist(H/4*W/4*len(aspect_ratios))*B)
         image_shapes = [box.size for box in anchors]
         concat_anchors = torch.cat([a.bbox for a in anchors], dim=0)
+        # anchors: (B*(H/4*W/4*len(aspect_ratios), 4)
         concat_anchors = concat_anchors.reshape(N, -1, 4)[batch_idx, topk_idx]
+        # anchors: (B, topk_idx, 4)
 
         proposals = self.box_coder.decode(
             box_regression.view(-1, 4), concat_anchors.view(-1, 4)
         )
+        # proposals: (B*topk_idx, 4)
 
         proposals = proposals.view(N, -1, 4)
+        # proposals: (B, topk_idx, 4)
 
         result = []
         for proposal, score, im_shape in zip(proposals, objectness, image_shapes):
@@ -118,6 +126,7 @@ class RPNPostProcessor(torch.nn.Module):
                 score_field="objectness",
             )
             result.append(boxlist)
+        # result: [Boxlist(with objectness)*B]
         return result
 
     def forward(self, anchors, objectness, box_regression, targets=None):
@@ -134,15 +143,34 @@ class RPNPostProcessor(torch.nn.Module):
         sampled_boxes = []
         num_levels = len(objectness)
         anchors = list(zip(*anchors))
+        # achors_before = 
+        # [[boxlist(H/4*W/4*len(aspect_ratios)),
+        # boxlist(H/8*W/8*len(aspect_ratios)),
+        # boxlist(H/16*W/16*len(aspect_ratios)),
+        # boxlist(H/32*W/32*len(aspect_ratios)),
+        # boxlist(H/64*W/64*len(aspect_ratios))]
+        # *B]
+        # achors_after =
+        # [(boxlist(H/4*W/4*len(aspect_ratios))*B),
+        # (boxlist(H/8*W/8*len(aspect_ratios))*B),
+        # (boxlist(H/16*W/16*len(aspect_ratios))*B),
+        # (boxlist(H/32*W/32*len(aspect_ratios))*B),
+        # (boxlist(H/64*W/64*len(aspect_ratios))*B)]
         for a, o, b in zip(anchors, objectness, box_regression):
+            # for each size
             sampled_boxes.append(self.forward_for_single_feature_map(a, o, b))
+            # [[Boxlist(with objectness)*B] * 5]
 
         boxlists = list(zip(*sampled_boxes))
+        # boxlists: [[Boxlist(with objectness)*5] * B]
         boxlists = [cat_boxlist(boxlist) for boxlist in boxlists]
+        # boxlists: [new Boxlist * B]
 
         if num_levels > 1:
             boxlists = self.select_over_all_levels(boxlists)
-
+            # select fpn_post_nms_top_n
+            # [Boxlist(len:fpn_post_nms_top_n)* B]
+            
         # append ground-truth bboxes to proposals
         if self.training and targets is not None:
             boxlists = self.add_gt_proposals(boxlists, targets)

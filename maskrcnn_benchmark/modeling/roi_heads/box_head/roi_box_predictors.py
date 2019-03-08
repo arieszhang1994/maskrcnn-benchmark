@@ -12,6 +12,7 @@ class FastRCNNPredictor(nn.Module):
         num_inputs = in_channels
 
         num_classes = config.MODEL.ROI_BOX_HEAD.NUM_CLASSES
+        # _C.MODEL.ROI_BOX_HEAD.NUM_CLASSES = 81
         self.avgpool = nn.AdaptiveAvgPool2d(1)
         self.cls_score = nn.Linear(num_inputs, num_classes)
         num_bbox_reg_classes = 2 if config.MODEL.CLS_AGNOSTIC_BBOX_REG else num_classes
@@ -37,6 +38,7 @@ class FPNPredictor(nn.Module):
         super(FPNPredictor, self).__init__()
         num_classes = cfg.MODEL.ROI_BOX_HEAD.NUM_CLASSES
         representation_size = in_channels
+        # _C.MODEL.ROI_BOX_HEAD.MLP_HEAD_DIM = 1024
 
         self.cls_score = nn.Linear(representation_size, num_classes)
         num_bbox_reg_classes = 2 if cfg.MODEL.CLS_AGNOSTIC_BBOX_REG else num_classes

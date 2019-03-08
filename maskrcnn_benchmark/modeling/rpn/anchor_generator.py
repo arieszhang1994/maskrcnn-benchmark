@@ -51,6 +51,7 @@ class AnchorGenerator(nn.Module):
             cell_anchors = [
                 generate_anchors(anchor_stride, sizes, aspect_ratios).float()
             ]
+            #generate_anchors: return (len(sizes)*len(aspect_ratios),4)
         else:
             if len(anchor_strides) != len(sizes):
                 raise RuntimeError("FPN should have #anchor_strides == #sizes")
@@ -63,6 +64,7 @@ class AnchorGenerator(nn.Module):
                 ).float()
                 for anchor_stride, size in zip(anchor_strides, sizes)
             ]
+            # cell_anchors: [[len(aspect_ratios),4] * (len(sizes)]
         self.strides = anchor_strides
         self.cell_anchors = BufferList(cell_anchors)
         self.straddle_thresh = straddle_thresh
@@ -111,7 +113,16 @@ class AnchorGenerator(nn.Module):
 
     def forward(self, image_list, feature_maps):
         grid_sizes = [feature_map.shape[-2:] for feature_map in feature_maps]
+        # grid_sizes(no fcn): [[H/16,W/16]
+        # grid_sizes: [[H/4,W/4],[H/8,W/8],[H/16,W/16],[H/32,W/32],[H/64,W/64]]
         anchors_over_all_feature_maps = self.grid_anchors(grid_sizes)
+        # anchors_over_all_feature_maps(no fcn): [(H/16*W/16*(len(sizes)*len(aspect_ratios),4)]
+        # anchors_over_all_feature_maps: 
+        # [(H/4*W/4*len(aspect_ratios),4), 
+        # (H/8*W/8*len(aspect_ratios),4),
+        # (H/16*W/16*len(aspect_ratios),4),
+        # (H/32*W/32*len(aspect_ratios),4),
+        # (H/64*W/64*len(aspect_ratios),4)]
         anchors = []
         for i, (image_height, image_width) in enumerate(image_list.image_sizes):
             anchors_in_image = []
@@ -122,6 +133,14 @@ class AnchorGenerator(nn.Module):
                 self.add_visibility_to(boxlist)
                 anchors_in_image.append(boxlist)
             anchors.append(anchors_in_image)
+        # achors (no fcn): [[boxlist(H/16*W/16*len(aspect_ratios)) * (len(sizes) *1 ]*B]
+        # achors: 
+        # [[boxlist(H/4*W/4*len(aspect_ratios)),
+        # boxlist(H/8*W/8*len(aspect_ratios)),
+        # boxlist(H/16*W/16*len(aspect_ratios)),
+        # boxlist(H/32*W/32*len(aspect_ratios)),
+        # boxlist(H/64*W/64*len(aspect_ratios))]
+        # *B]
         return anchors
 
 

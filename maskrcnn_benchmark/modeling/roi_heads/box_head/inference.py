@@ -53,7 +53,10 @@ class PostProcessor(nn.Module):
                 the extra fields labels and scores
         """
         class_logits, box_regression = x
+        # class_logits: (num_rois,81)
+        # box_regression: (num_rois, 81*4)
         class_prob = F.softmax(class_logits, -1)
+        # boxes: [Boxlist(len:fpn_post_nms_top_n)* B]
 
         # TODO think about a representation of batch of boxes
         image_shapes = [box.size for box in boxes]
@@ -65,6 +68,7 @@ class PostProcessor(nn.Module):
         proposals = self.box_coder.decode(
             box_regression.view(sum(boxes_per_image), -1), concat_boxes
         )
+        # proposals: (num_rois, 81*4)
         if self.cls_agnostic_bbox_reg:
             proposals = proposals.repeat(1, class_prob.shape[1])
 
@@ -72,15 +76,20 @@ class PostProcessor(nn.Module):
 
         proposals = proposals.split(boxes_per_image, dim=0)
         class_prob = class_prob.split(boxes_per_image, dim=0)
+        #proposals:((fpn_post_nms_top_n,81*4)*B)
+        #class_prob:((fpn_post_nms_top_n,81)*B)
 
         results = []
         for prob, boxes_per_img, image_shape in zip(
             class_prob, proposals, image_shapes
         ):
+            # each batch
             boxlist = self.prepare_boxlist(boxes_per_img, prob, image_shape)
+            # boxlist(add "scores")
             boxlist = boxlist.clip_to_image(remove_empty=False)
             boxlist = self.filter_results(boxlist, num_classes)
             results.append(boxlist)
+        #results: [boxlist(add "scores")*B]
         return results
 
     def prepare_boxlist(self, boxes, scores, image_shape):

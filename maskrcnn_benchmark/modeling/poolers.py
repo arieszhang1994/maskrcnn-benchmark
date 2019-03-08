@@ -77,6 +77,7 @@ class Pooler(nn.Module):
 
     def convert_to_roi_format(self, boxes):
         concat_boxes = cat([b.bbox for b in boxes], dim=0)
+        #concat_boxes：(fpn_post_nms_top_n* B,4)
         device, dtype = concat_boxes.device, concat_boxes.dtype
         ids = cat(
             [
@@ -86,6 +87,7 @@ class Pooler(nn.Module):
             dim=0,
         )
         rois = torch.cat([ids, concat_boxes], dim=1)
+        #rois: (fpn_post_nms_top_n* B,5) rois[0]: index for each batch
         return rois
 
     def forward(self, x, boxes):
@@ -102,6 +104,7 @@ class Pooler(nn.Module):
             return self.poolers[0](x[0], rois)
 
         levels = self.map_levels(boxes)
+        # predict which level the feature maps belong to
 
         num_rois = len(rois)
         num_channels = x[0].shape[1]
@@ -116,8 +119,10 @@ class Pooler(nn.Module):
         for level, (per_level_feature, pooler) in enumerate(zip(x, self.poolers)):
             idx_in_level = torch.nonzero(levels == level).squeeze(1)
             rois_per_level = rois[idx_in_level]
+            #select level
             result[idx_in_level] = pooler(per_level_feature, rois_per_level)
 
+        # result: (num_rois, num_channels, output_size, output_size)
         return result
 
 

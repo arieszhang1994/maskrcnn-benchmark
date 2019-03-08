@@ -123,6 +123,22 @@ class RPNModule(torch.nn.Module):
         head = rpn_head(
             cfg, in_channels, anchor_generator.num_anchors_per_location()[0]
         )
+        # if logits,bbox_reg = head(x)
+        # x: [(B, 1024, H/4, W/4),
+        # (B, 1024, H/8, W/8),
+        # (B, 1024, H/16, W/16),
+        # (B, 1024, H/32, W/32),
+        # (B, 1024, H/64, W/64)] 
+        # objectness : [(B, 15, H/4, W/4),
+        # (B, 15, H/8, W/8),
+        # (B, 15, H/16, W/16),
+        # (B, 15, H/32, W/32),
+        # (B, 15, H/64, W/64)] 
+        # rpn_box_regression : [(B, 15x4, H/4, W/4),
+        # (B, 15x4, H/8, W/8),
+        # (B, 15x4, H/16, W/16),
+        # (B, 15x4, H/32, W/32),
+        # (B, 15x4, H/64, W/64)] 
 
         rpn_box_coder = BoxCoder(weights=(1.0, 1.0, 1.0, 1.0))
 

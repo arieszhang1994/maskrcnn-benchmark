@@ -16,6 +16,7 @@ from . import resnet
 def build_resnet_backbone(cfg):
     body = resnet.ResNet(cfg)
     model = nn.Sequential(OrderedDict([("body", body)]))
+    # if y = body(x), y: (B, 1024, H/16, W/16)
     model.out_channels = cfg.MODEL.RESNETS.BACKBONE_OUT_CHANNELS
     return model
 
@@ -25,8 +26,15 @@ def build_resnet_backbone(cfg):
 @registry.BACKBONES.register("R-152-FPN")
 def build_resnet_fpn_backbone(cfg):
     body = resnet.ResNet(cfg)
+    # if y = body(x), 
+    # y: [(B, 256, H/4, W/4),
+    # (B, 512, H/8, W/8),
+    # (B, 1024, H/16, W/16),
+    # (B, 2048, H/32, W/32)]  
     in_channels_stage2 = cfg.MODEL.RESNETS.RES2_OUT_CHANNELS
+    #_C.MODEL.RESNETS.RES2_OUT_CHANNELS = 256
     out_channels = cfg.MODEL.RESNETS.BACKBONE_OUT_CHANNELS
+    #_C.MODEL.BACKBONE.OUT_CHANNELS = 256 * 4
     fpn = fpn_module.FPN(
         in_channels_list=[
             in_channels_stage2,
@@ -40,6 +48,12 @@ def build_resnet_fpn_backbone(cfg):
         ),
         top_blocks=fpn_module.LastLevelMaxPool(),
     )
+    # if y = fpn(y)
+    # y: [(B, 1024, H/4, W/4),
+    # (B, 1024, H/8, W/8),
+    # (B, 1024, H/16, W/16),
+    # (B, 1024, H/32, W/32),
+    # (B, 1024, H/64, W/64)]
     model = nn.Sequential(OrderedDict([("body", body), ("fpn", fpn)]))
     model.out_channels = out_channels
     return model
